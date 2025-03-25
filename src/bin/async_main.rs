@@ -55,9 +55,8 @@ pub async fn test_swd(swd: &mut Swd<'_>) -> Result<(), RequestError> {
         info!("{:08x?}", swd.read_ap(AP, 0x10 + 4 * i).await);
     }
 
-    info!("status = {:x?}", swd.read_dp_register::<CtrlStat>().await);
-
     let _ = swd.write_dp_register(CtrlStat::default()).await;
+    info!("status = {:x?}", swd.read_dp_register::<CtrlStat>().await);
 
     Ok(())
 }
