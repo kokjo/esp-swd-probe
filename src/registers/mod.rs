@@ -43,17 +43,17 @@ macro_rules! make_register {
 macro_rules! impl_field_get {
     (($name:ident, $start:expr, $size:expr, bool)) => {
         pub fn $name(&self) -> bool {
-            ((self.0 >> $start) & ((0xffffffff >> (32 - $size)) - 1)) == 1
+            ((self.0 >> $start) & (0xffffffff >> (32 - $size))) == 1
         }
     };
     (($name:ident, $start:expr, $size:expr, u8)) => {
         pub fn $name(&self) -> u8 {
-            ((self.0 >> $start) & ((0xffffffff >> (32 - $size)) - 1)) as u8
+            ((self.0 >> $start) & (0xffffffff >> (32 - $size))) as u8
         }
     };
     (($name:ident, $start:expr, $size:expr, $res:ident)) => {
         pub fn $name(&self) -> $res {
-            ((self.0 >> $start) & ((0xffffffff >> (32 - $size)) - 1)).into()
+            ((self.0 >> $start) & (0xffffffff >> (32 - $size))).into()
         }
     };
     (($name:ident, $start:expr, $size:expr)) => {
