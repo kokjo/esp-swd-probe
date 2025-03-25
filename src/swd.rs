@@ -316,7 +316,7 @@ impl Swd<'_> {
             .await?;
         self.read_request(APnDP::AP, [addr & 0x04 == 0x04, addr & 0x08 == 0x08])
             .await?;
-        let value = self.read_dp_register::<RdBuff>().await?.0;
+        let value = self.read_dp_register::<RdBuff>().await?.data();
         trace!("Reading AP register {:02x}:{:02x}: {:08x}", ap, addr, value);
         Ok(value)
     }
