@@ -34,10 +34,11 @@ pub async fn test_swd(swd: &mut Swd<'_>) -> Result<(), RequestError> {
         )
         .await;
 
-    let _ = swd.write_dp_register(
-        CtrlStat::default()
+    let _ = swd
+        .write_dp_register(
+            CtrlStat::default()
                 .set_csyspwrupreq(true)
-                .set_cdbgpwrupreq(true)
+                .set_cdbgpwrupreq(true),
         )
         .await;
 
