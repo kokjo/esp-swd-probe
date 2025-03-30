@@ -27,7 +27,6 @@ async fn net_task(mut runner: Runner<'static, WifiDevice<'static, WifiStaDevice>
     runner.run().await
 }
 
-
 pub async fn wait_for_link(stack: Stack<'static>) {
     info!("Waiting for link...");
     loop {

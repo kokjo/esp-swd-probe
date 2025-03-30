@@ -1,7 +1,7 @@
 #![no_std]
 #![no_main]
 
-use alloc::vec::Vec;
+use alloc::{vec, vec::Vec};
 use embassy_executor::Spawner;
 use embassy_net::tcp::TcpSocket;
 use embassy_time::Timer;
@@ -31,16 +31,17 @@ pub async fn test_swd(swd: &mut Swd<'_>) -> Result<(), RequestError> {
 
     swd.modify_dp_register::<CtrlStat>(|reg| {
         info!("ctrlstat = {:x?}", reg);
-        reg
-            .set_csyspwrupreq(true)
+        reg.set_csyspwrupreq(true)
             .set_cdbgpwrupreq(true)
             .set_cdbgrstreq(true)
-    }).await?;
+    })
+    .await?;
 
     swd.modify_dp_register::<CtrlStat>(|reg| {
         info!("ctrlstat = {:x?}", reg);
         reg.set_cdbgrstreq(false)
-    }).await?;
+    })
+    .await?;
 
     const AP: u8 = 0;
 
@@ -88,36 +89,45 @@ impl TryFrom<&[u8]> for Command {
         let (&cmd, data) = data.split_first().ok_or(CommandError::EmptyCommand)?;
         match cmd {
             0x00 => {
-                if data.len() < 1 {
+                if data.is_empty() {
                     return Err(CommandError::TooShort);
                 }
                 Ok(Command::ReadDp(data[0]))
-            },
+            }
             0x01 => {
                 if data.len() < 5 {
                     return Err(CommandError::TooShort);
                 }
-                Ok(Command::WriteDp(data[0], u32::from_be_bytes(data[1..].try_into().unwrap())))
-            },
+                Ok(Command::WriteDp(
+                    data[0],
+                    u32::from_be_bytes(data[1..].try_into().unwrap()),
+                ))
+            }
             0x02 => {
-                if data.len() < 1 {
+                if data.is_empty() {
                     return Err(CommandError::TooShort);
                 }
                 Ok(Command::ReadAp(data[0]))
-            },
+            }
             0x03 => {
                 if data.len() < 5 {
                     return Err(CommandError::TooShort);
                 }
-                Ok(Command::WriteAp(data[0], u32::from_be_bytes(data[1..].try_into().unwrap())))
-            },
+                Ok(Command::WriteAp(
+                    data[0],
+                    u32::from_be_bytes(data[1..].try_into().unwrap()),
+                ))
+            }
             0x04 => {
                 if data.len() < 9 {
                     return Err(CommandError::TooShort);
                 }
-                Ok(Command::SwjSequence(data[0], u64::from_be_bytes(data[1..].try_into().unwrap())))
+                Ok(Command::SwjSequence(
+                    data[0],
+                    u64::from_be_bytes(data[1..].try_into().unwrap()),
+                ))
             }
-            _ => Err(CommandError::UnknownCommand)
+            _ => Err(CommandError::UnknownCommand),
         }
     }
 }
@@ -135,18 +145,24 @@ pub enum ProtocolError {
 pub async fn recv_message(sock: &mut TcpSocket<'_>) -> Result<Vec<u8>, ProtocolError> {
     let mut size = [0u8; 1];
 
-    sock.read_exact(&mut size).await.map_err(|_| ProtocolError::EOF)?;
-    let mut msg = Vec::with_capacity(size[0] as usize);
-    for _ in 0..size[0] {
-        msg.push(0x00);
-    }
-    sock.read_exact(&mut msg).await.map_err(|_| ProtocolError::EOF)?;
+    sock.read_exact(&mut size)
+        .await
+        .map_err(|_| ProtocolError::EOF)?;
+    let mut msg = vec![0x00; size[0] as usize];
+    sock.read_exact(&mut msg)
+        .await
+        .map_err(|_| ProtocolError::EOF)?;
     Ok(msg)
 }
 
 pub async fn send_message(sock: &mut TcpSocket<'_>, msg: &[u8]) -> Result<(), ProtocolError> {
-    let size: u8 = msg.len().try_into().map_err(|_|ProtocolError::ReplyTooBig)?;
-    sock.write_all(&[size]).await.map_err(|_| ProtocolError::EOF)?;
+    let size: u8 = msg
+        .len()
+        .try_into()
+        .map_err(|_| ProtocolError::ReplyTooBig)?;
+    sock.write_all(&[size])
+        .await
+        .map_err(|_| ProtocolError::EOF)?;
     sock.write_all(msg).await.map_err(|_| ProtocolError::EOF)?;
     Ok(())
 }
@@ -164,16 +180,14 @@ impl From<Reply> for Vec<u8> {
             Reply::Read(Ok(value)) => {
                 msg.push(0x00);
                 msg.extend(value.to_be_bytes())
-            },
+            }
             Reply::Read(Err(err)) => {
                 msg.push(err.into());
             }
             Reply::Write(Ok(())) => {
                 msg.push(0x00);
-            },
-            Reply::Write(Err(err)) => {
-                msg.push(err.into())
             }
+            Reply::Write(Err(err)) => msg.push(err.into()),
         }
         msg
     }
@@ -183,28 +197,25 @@ pub fn a_to_bits(a: u8) -> [bool; 2] {
     [a & 0x04 == 0x04, a & 0x08 == 0x08]
 }
 
-pub async fn handle_connection(sock: &mut TcpSocket<'_>, swd: &mut Swd<'_>) -> Result<(), ProtocolError> {
+pub async fn handle_connection(
+    sock: &mut TcpSocket<'_>,
+    swd: &mut Swd<'_>,
+) -> Result<(), ProtocolError> {
     loop {
         let msg = recv_message(sock).await?;
         let cmd: Command = (&msg[..]).try_into()?;
         debug!("Command: {:x?}", cmd);
         let reply: Reply = match cmd {
-            Command::ReadDp(a) => {
-                Reply::Read(swd.read_request(APnDP::DP, a_to_bits(a)).await).into()
-            },
+            Command::ReadDp(a) => Reply::Read(swd.read_request(APnDP::DP, a_to_bits(a)).await),
             Command::WriteDp(a, value) => {
-                Reply::Write(swd.write_request(APnDP::DP, a_to_bits(a), value).await).into()
-            },
-            Command::ReadAp(a) => {
-                Reply::Read(swd.read_selected_ap(a).await).into()
-            },
-            Command::WriteAp(a, value) => {
-                Reply::Write(swd.write_selected_ap(a, value).await).into()
-            },
+                Reply::Write(swd.write_request(APnDP::DP, a_to_bits(a), value).await)
+            }
+            Command::ReadAp(a) => Reply::Read(swd.read_selected_ap(a).await),
+            Command::WriteAp(a, value) => Reply::Write(swd.write_selected_ap(a, value).await),
             Command::SwjSequence(bit_len, bits) => {
                 swd.swj_sequence(bit_len, bits).await;
-                Reply::Write(Ok(())).into()
-            },
+                Reply::Write(Ok(()))
+            }
         };
         debug!("Reply: {:x?}", reply);
         let msg: Vec<u8> = reply.into();
@@ -228,7 +239,14 @@ async fn main(spawner: Spawner) {
 
     let rng = esp_hal::rng::Rng::new(peripherals.RNG);
 
-    let wifi_sta = wifi::start_wifi_sta(&spawner, rng, peripherals.TIMG0, peripherals.RADIO_CLK, peripherals.WIFI).await;
+    let wifi_sta = wifi::start_wifi_sta(
+        &spawner,
+        rng,
+        peripherals.TIMG0,
+        peripherals.RADIO_CLK,
+        peripherals.WIFI,
+    )
+    .await;
     let stack = start_net(spawner, rng, wifi_sta);
     wait_for_link(stack).await;
     wait_for_dhcp(stack).await;
@@ -243,14 +261,16 @@ async fn main(spawner: Spawner) {
         info!("Waiting for connection!");
         match socket.accept(1337).await {
             Ok(()) => {
-                info!("Accepted connection from {}", socket.remote_endpoint().unwrap());
+                info!(
+                    "Accepted connection from {}",
+                    socket.remote_endpoint().unwrap()
+                );
                 let res = handle_connection(&mut socket, &mut swd).await;
                 info!("Debug Session done: {:?}", res);
-
-            },
+            }
             Err(err) => {
                 info!("Failed to accept on socket: {:?}", err)
-            },
+            }
         }
     }
 }

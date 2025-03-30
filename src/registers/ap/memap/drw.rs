@@ -1,8 +1,9 @@
-use crate::{make_register, registers::ap::{APRegister, ReadRegister, WriteRegister}};
+use crate::{
+    make_register,
+    registers::ap::{APRegister, ReadRegister, WriteRegister},
+};
 
-make_register!(Drw, {
-    (data, 0, 32)
-});
+make_register!(Drw, { (data, 0, 32) });
 
 impl APRegister for Drw {
     const ADDRESS: u8 = 0x0c;

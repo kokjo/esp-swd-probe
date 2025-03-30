@@ -331,7 +331,10 @@ impl Swd<'_> {
         self.write_request(APnDP::DP, Reg::A, reg.into()).await
     }
 
-    pub async fn modify_dp_register<Reg: dp::ReadRegister + dp::WriteRegister>(&mut self, f: impl FnOnce(Reg) -> Reg) -> Result<(), RequestError> {
+    pub async fn modify_dp_register<Reg: dp::ReadRegister + dp::WriteRegister>(
+        &mut self,
+        f: impl FnOnce(Reg) -> Reg,
+    ) -> Result<(), RequestError> {
         let old_reg = self.read_dp_register().await?;
         let new_reg = f(old_reg);
         self.write_dp_register(new_reg).await?;
@@ -379,7 +382,6 @@ impl Swd<'_> {
         self.write_request(APnDP::AP, [addr & 0x04 == 0x04, addr & 0x08 == 0x08], value)
             .await?;
         Ok(())
-
     }
 
     pub async fn write_ap_register<Reg: ap::WriteRegister>(
@@ -396,7 +398,11 @@ impl Swd<'_> {
         self.write_ap(ap, Reg::ADDRESS, reg.into()).await
     }
 
-    pub async fn modify_ap_register<Reg: ap::ReadRegister + ap::WriteRegister>(&mut self, ap:u8, f: impl FnOnce(Reg) -> Reg) -> Result<(), RequestError> {
+    pub async fn modify_ap_register<Reg: ap::ReadRegister + ap::WriteRegister>(
+        &mut self,
+        ap: u8,
+        f: impl FnOnce(Reg) -> Reg,
+    ) -> Result<(), RequestError> {
         let old_reg = self.read_ap_register(ap).await?;
         let new_reg = f(old_reg);
         self.write_ap_register(ap, new_reg).await?;

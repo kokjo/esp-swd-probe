@@ -1,4 +1,7 @@
-use crate::{make_register, registers::ap::{APRegister, ReadRegister, WriteRegister}};
+use crate::{
+    make_register,
+    registers::ap::{APRegister, ReadRegister, WriteRegister},
+};
 
 make_register!(CSW, {
     (dbgswenable, 31, 1, bool),

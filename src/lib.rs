@@ -15,7 +15,7 @@ pub mod memap;
 pub mod registers;
 pub mod swd;
 
-pub mod wifi;
 pub mod net;
+pub mod wifi;
 
 pub(crate) use registers::make_register;

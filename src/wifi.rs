@@ -1,7 +1,10 @@
 use embassy_executor::Spawner;
 use embassy_time::Timer;
 use esp_hal::{peripheral::Peripheral, timer::timg::TimerGroup};
-use esp_wifi::{wifi::{ClientConfiguration, Configuration, WifiController, WifiEvent, WifiStaDevice}, EspWifiController, EspWifiRngSource};
+use esp_wifi::{
+    wifi::{ClientConfiguration, Configuration, WifiController, WifiEvent, WifiStaDevice},
+    EspWifiController, EspWifiRngSource,
+};
 use log::info;
 
 use crate::mk_static;
@@ -14,7 +17,7 @@ pub async fn start_wifi_sta(
     rng: impl EspWifiRngSource,
     timg: esp_hal::peripherals::TIMG0,
     radio_clk: impl Peripheral<P = esp_hal::peripherals::RADIO_CLK> + 'static,
-    wifi: impl Peripheral<P = esp_hal::peripherals::WIFI> + 'static
+    wifi: impl Peripheral<P = esp_hal::peripherals::WIFI> + 'static,
 ) -> esp_wifi::wifi::WifiDevice<'static, WifiStaDevice> {
     // Setup and spawn wifi stack
     let timg0 = TimerGroup::new(timg);
