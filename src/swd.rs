@@ -45,6 +45,15 @@ impl<'a> Swd<'a> {
         bit
     }
 
+    pub async fn swj_sequence(&mut self, mut bit_len: u8, mut bits: u64) {
+        self.swdio.set_as_output();
+        while bit_len != 0 {
+            bit_len -= 1;
+            self.swd_clock(bits & 1 == 1).await;
+            bits >>= 1;
+        }
+    }
+
     pub async fn turnaround_host(&mut self) {
         trace!("Turnaround to HOST");
         self.swd_clock(false).await;
@@ -199,6 +208,17 @@ pub enum RequestError {
     ParityError,
 }
 
+impl From<RequestError> for u8 {
+    fn from(value: RequestError) -> Self {
+        match value {
+            RequestError::Timeout => 0x00,
+            RequestError::Fault => 0x01,
+            RequestError::InvalidAck => 0x02,
+            RequestError::ParityError => 0x03,
+        }
+    }
+}
+
 impl Swd<'_> {
     pub async fn send_request(&mut self, apndp: APnDP, rnw: RnW, a: [bool; 2]) {
         let apndp: bool = apndp.into();
@@ -311,13 +331,25 @@ impl Swd<'_> {
         self.write_request(APnDP::DP, Reg::A, reg.into()).await
     }
 
+    pub async fn modify_dp_register<Reg: dp::ReadRegister + dp::WriteRegister>(&mut self, f: impl FnOnce(Reg) -> Reg) -> Result<(), RequestError> {
+        let old_reg = self.read_dp_register().await?;
+        let new_reg = f(old_reg);
+        self.write_dp_register(new_reg).await?;
+        Ok(())
+    }
+
     pub async fn read_ap(&mut self, ap: u8, addr: u8) -> Result<u32, RequestError> {
         self.write_dp_register(Select::default().set_apsel(ap).set_apbanksel(addr >> 4))
             .await?;
+        let value = self.read_selected_ap(addr).await?;
+        trace!("Reading AP register {:02x}:{:02x}: {:08x}", ap, addr, value);
+        Ok(value)
+    }
+
+    pub async fn read_selected_ap(&mut self, addr: u8) -> Result<u32, RequestError> {
         self.read_request(APnDP::AP, [addr & 0x04 == 0x04, addr & 0x08 == 0x08])
             .await?;
         let value = self.read_dp_register::<RdBuff>().await?.data();
-        trace!("Reading AP register {:02x}:{:02x}: {:08x}", ap, addr, value);
         Ok(value)
     }
 
@@ -339,9 +371,15 @@ impl Swd<'_> {
         trace!("Writing AP register {:02x}:{:02x}: {:08x}", ap, addr, value);
         self.write_dp_register(Select::default().set_apsel(ap).set_apbanksel(addr >> 4))
             .await?;
+        self.write_selected_ap(addr, value).await?;
+        Ok(())
+    }
+
+    pub async fn write_selected_ap(&mut self, addr: u8, value: u32) -> Result<(), RequestError> {
         self.write_request(APnDP::AP, [addr & 0x04 == 0x04, addr & 0x08 == 0x08], value)
             .await?;
         Ok(())
+
     }
 
     pub async fn write_ap_register<Reg: ap::WriteRegister>(
@@ -356,5 +394,12 @@ impl Swd<'_> {
             reg
         );
         self.write_ap(ap, Reg::ADDRESS, reg.into()).await
+    }
+
+    pub async fn modify_ap_register<Reg: ap::ReadRegister + ap::WriteRegister>(&mut self, ap:u8, f: impl FnOnce(Reg) -> Reg) -> Result<(), RequestError> {
+        let old_reg = self.read_ap_register(ap).await?;
+        let new_reg = f(old_reg);
+        self.write_ap_register(ap, new_reg).await?;
+        Ok(())
     }
 }
